@@ -1,0 +1,59 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>공 개수 조절 · 갈톤 보드 실험</title>
+<style>
+:root{color-scheme:dark;font-family:Arial,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:#090e1b;color:#f2f5ff}*{box-sizing:border-box}body{margin:0;overflow:hidden}canvas{position:absolute;inset:0;width:1600px;height:900px}.copy{position:absolute;left:100px;top:70px;width:650px;pointer-events:none}h1{font-size:62px;letter-spacing:-.055em;line-height:1.18;margin:0 0 18px}.accent{color:#91b6ff}.intro{font-size:23px;color:#a7b4d0;line-height:1.6;margin:0}.formula{font-size:34px;letter-spacing:-.02em;color:#ffd166;margin:26px 0 8px}.assumption{font-size:18px;line-height:1.6;color:#a7b4d0;margin:0}.stats{position:absolute;left:100px;top:374px;display:flex;gap:26px;pointer-events:none}.stat{min-width:124px}.stat span{display:block;color:#a7b4d0;font-size:18px;margin-bottom:7px}.stat strong{font-size:30px;font-weight:600;font-variant-numeric:tabular-nums}.controls{position:absolute;left:100px;top:720px;display:flex;align-items:center;gap:12px}button,select{font:inherit;font-size:21px;min-height:48px;border:1px solid #46516a;border-radius:5px;color:#f2f5ff;background:#111b2c;padding:0 17px;cursor:pointer}button.primary{background:#91b6ff;color:#090e1b;border-color:#91b6ff}button:hover,select:hover{border-color:#91b6ff}button:focus-visible,select:focus-visible{outline:2px solid #c1d7ff;outline-offset:4px}.speed-label{font-size:18px;color:#a7b4d0;display:flex;align-items:center;gap:9px}.status{position:absolute;left:100px;top:775px;margin:0;font-size:17px;color:#a7b4d0;max-width:700px}.board-label{position:absolute;left:930px;top:98px;color:#8eddb6;font-size:21px;margin:0}.error{position:absolute;inset:200px 150px;background:#090e1b;font-size:28px;color:#f2f5ff;padding:50px;z-index:4}[hidden]{display:none!important}
+
+.count-label{display:flex;align-items:center;gap:9px;font-size:18px;color:#a7b4d0}.count-label input{width:106px;min-height:48px;padding:0 9px;border:1px solid #46516a;border-radius:5px;background:#111b2c;color:#f2f5ff;font:inherit;font-size:21px}.count-label input:focus-visible{outline:2px solid #c1d7ff;outline-offset:4px}.count-label input:disabled{opacity:.5;cursor:not-allowed}
+</style></head><body>
+<canvas id="galton" width="1600" height="900" role="img" aria-label="13줄의 핀 사이로 1200개 공이 떨어져 14개 구간에 쌓이는 갈톤 보드와 도착 분포"></canvas>
+<div class="copy"><h1><span id="target-count">1,200</span>개 <span class="accent">공의 분포</span></h1><p class="intro">핀 사이로 떨어지는 공을 직접 집계하고<br>정규분포 근사 곡선과 비교해보세요.</p><p class="formula">B(13, 0.5) ≈ N(6.5, 3.25)</p><p class="assumption">이상적 가정: 각 단계가 독립이고, 좌우 확률이 ½<br>N(평균, 분산) · 실제 물리 결과는 이론과 다를 수 있습니다.</p></div>
+<div class="stats"><div class="stat"><span id="released-label">투입 / 1,200</span><strong id="released">0</strong></div><div class="stat"><span id="arrived-label">도착 / 1,200</span><strong id="arrived">0</strong></div><div class="stat"><span>평균 위치</span><strong id="mean">—</strong></div><div class="stat"><span>분산</span><strong id="variance">—</strong></div></div>
+<p class="board-label">13줄의 핀 · 14개의 도착 구간</p>
+<div class="controls"><label class="count-label" for="ball-count">공 개수<input id="ball-count" type="number" min="1" max="1800" step="1" required value="1200" title="1~1,800개 중 정수로 입력"></label><button class="primary" id="run" type="button">1200개 떨어뜨리기</button><button id="reset" type="button">다시 실험</button><label class="speed-label">재생 속도<select id="speed" aria-label="실험 재생 속도"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select></label></div>
+<p class="status" id="experiment-status" role="status">시작 버튼을 누르면 실험을 진행합니다.</p><p class="error" id="error" role="alert" hidden></p>
+<script src="vendor/matter-0.20.0.min.js"></script><script src="galton-physics.js"></script>
+<script>
+if(!window.Matter||!window.GaltonExperiment){document.querySelector('#error').hidden=false;document.querySelector('#error').textContent='물리 실험 파일을 불러오지 못했습니다. 로컬 미리보기를 다시 열어주세요.';throw new Error('Matter.js assets unavailable')}
+const canvas=document.querySelector('#galton'),ctx=canvas.getContext('2d');
+let seed=20261028,experiment=new GaltonExperiment(seed),running=false,speed=1,last=0,accumulator=0;
+const run=document.querySelector('#run'),status=document.querySelector('#experiment-status'),countInput=document.querySelector('#ball-count');
+function updateControls(){
+ const count=experiment.total.toLocaleString('ko-KR');
+ document.querySelector('#target-count').textContent=count;
+ document.querySelector('#released-label').textContent='투입 / '+count;
+ document.querySelector('#arrived-label').textContent='도착 / '+count;
+ canvas.setAttribute('aria-label','13줄의 핀 사이로 '+count+'개 공이 떨어져 14개 구간에 쌓이는 갈톤 보드와 도착 분포');
+ countInput.disabled=experiment.balls.length>0||running;
+ run.textContent=running?'일시정지':experiment.done?'실험 완료':experiment.balls.length?'계속하기':count+'개 떨어뜨리기';run.disabled=experiment.done;
+ status.textContent=experiment.done?count+'개 도착 완료 · 다시 실험을 누르면 공 개수도 바꿀 수 있습니다.':running?'공의 이동과 도착을 계산합니다. 실험 중에는 개수가 고정됩니다.':experiment.balls.length?'일시정지 · 개수를 바꾸려면 다시 실험을 누르세요.':'공 개수(1~1,800개)를 입력하고 시작하세요.';
+}
+function resetExperiment(){
+ Matter.Composite.clear(experiment.engine.world,false);Matter.Engine.clear(experiment.engine);
+ experiment=new GaltonExperiment(++seed,Number(countInput.value));running=false;last=0;accumulator=0;updateControls();draw();
+}
+countInput.onchange=()=>{if(countInput.checkValidity())resetExperiment()};
+run.onclick=()=>{if(!countInput.reportValidity())return;running=!running;accumulator=0;last=0;updateControls()};
+document.querySelector('#reset').onclick=()=>{if(countInput.reportValidity())resetExperiment()};
+document.querySelector('#speed').onchange=e=>speed=Number(e.target.value);
+function draw(){
+ const state=experiment.summary();ctx.clearRect(0,0,1600,900);ctx.fillStyle='#090e1b';ctx.fillRect(0,0,1600,900);
+ // Board walls and pins use the same coordinates as the Matter.js bodies.
+ ctx.lineWidth=3;ctx.strokeStyle='#397d61';ctx.beginPath();for(const wall of experiment.walls){ctx.moveTo(wall.x1,wall.y1);ctx.lineTo(wall.x2,wall.y2)}ctx.stroke();
+ ctx.fillStyle='#397d61';for(const cap of experiment.caps){ctx.beginPath();cap.vertices.forEach((v,i)=>i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y));ctx.closePath();ctx.fill()}
+ ctx.fillStyle='#5fc795';for(const pin of experiment.pins){ctx.beginPath();ctx.arc(pin.x,pin.y,6,0,Math.PI*2);ctx.fill()}
+ ctx.fillStyle='#f8fafc';for(const ball of experiment.balls){ctx.beginPath();ctx.arc(ball.body.position.x,ball.body.position.y,experiment.ballRadius,0,Math.PI*2);ctx.fill()}
+ ctx.font='17px Arial';ctx.textAlign='center';ctx.fillStyle='#b4c4dd';state.counts.forEach((n,i)=>{ctx.fillText(String(n),experiment.left+(i+.5)*42,842)});
+ // Histogram counts and normal density share the same count axis and bin width 1.
+ const left=100,top=496,width=630,height=190,base=top+height,unit=width/14,normalPeak=experiment.total/Math.sqrt(2*Math.PI*3.25),maximum=Math.ceil(Math.max(10,normalPeak*1.2,...state.counts.map(n=>n+5))/10)*10;
+ ctx.textAlign='left';ctx.fillStyle='#d2ddf1';ctx.font='21px Arial';ctx.fillText('도착한 공의 분포',left,474);
+ ctx.font='16px Arial';ctx.fillStyle='#91b6ff';ctx.fillText('막대: 실제 집계',left+265,474);ctx.fillStyle='#ffd166';ctx.fillText('곡선: 이상적 정규근사',left+403,474);
+ ctx.strokeStyle='#27344d';ctx.lineWidth=1;
+ for(const count of [0,maximum/2,maximum]){const y=base-count/maximum*height;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(left+width,y);ctx.stroke();ctx.fillStyle='#899bb9';ctx.font='15px Arial';ctx.textAlign='right';ctx.fillText(String(Math.round(count)),left-10,y+5)}
+ state.counts.forEach((n,i)=>{const h=n/maximum*height;ctx.fillStyle='#91b6ff99';ctx.fillRect(left+i*unit+4,base-h,unit-8,h);ctx.textAlign='center';ctx.fillStyle='#a7b4d0';ctx.font='16px Arial';ctx.fillText(String(i),left+(i+.5)*unit,base+23)});
+ const sigma=Math.sqrt(3.25);ctx.beginPath();for(let i=0;i<=280;i++){const x=-.5+14*i/280,count=state.arrived/(sigma*Math.sqrt(2*Math.PI))*Math.exp(-((x-6.5)**2)/(2*3.25));const px=left+(x+.5)*unit,py=base-count/maximum*height;i?ctx.lineTo(px,py):ctx.moveTo(px,py)}ctx.strokeStyle='#ffd166';ctx.lineWidth=3;ctx.stroke();
+ document.querySelector('#released').textContent=String(state.released);document.querySelector('#arrived').textContent=String(state.arrived);document.querySelector('#mean').textContent=state.mean===null?'—':state.mean.toFixed(2);document.querySelector('#variance').textContent=state.variance===null?'—':state.variance.toFixed(2);
+}
+function frame(now){
+ if(running){if(!last)last=now;accumulator+=Math.min((now-last)/1000,.1)*speed;let steps=0;while(accumulator>=1/120&&steps<48){experiment.step();accumulator-=1/120;steps++;if(experiment.done){running=false;accumulator=0;updateControls();break}}draw()}last=now;requestAnimationFrame(frame);
+}
+draw();updateControls();requestAnimationFrame(frame);
+</script></body></html>

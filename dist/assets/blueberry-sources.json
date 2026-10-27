@@ -1,0 +1,14 @@
+{
+  "reference": "https://ai-lecture-sns-automation.vercel.app/",
+  "images": {
+    "before": "https://raw.githubusercontent.com/quirinal36/ai_lecture_sns_automation/main/exercise01/image_01%28before%29.png",
+    "after": "https://raw.githubusercontent.com/quirinal36/ai_lecture_sns_automation/main/exercise01/image_01%28after%29.png"
+  },
+  "note": "The Windows attachment paths are not accessible from this Mac. These identical-looking images from the user-supplied reference site were visually checked against the two attached images. Original 941x1672 dimensions preserved.",
+  "library": {
+    "name": "img-comparison-slider",
+    "version": "8.0.6",
+    "license": "MIT",
+    "localPatch": "Dragging uses getBoundingClientRect() width/height to account for the slide CSS scale."
+  }
+}
