@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>슬라이드 전환효과 실습</title>
+<style>
+:root{color-scheme:dark;font-family:Arial,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;background:#090e1b;color:#f2f5ff}*{box-sizing:border-box}body{margin:0;padding:5vh 6vw}h1{font-size:5vw;letter-spacing:-.06em;margin:0 0 1vh}p{color:#a7b4d0;font-size:1.9vw;margin:0 0 3vh}button{font:inherit;color:inherit;cursor:pointer;min-height:44px;border:1px solid #46516a;background:#162139;border-radius:8px;padding:1.3vh 1.7vw}button:focus-visible{outline:3px solid white;outline-offset:3px}button[aria-pressed=true]{background:#91b6ff;color:#090e1b;border-color:#91b6ff}.choices{display:flex;gap:1vw;margin-bottom:2.5vh;font-size:1.8vw}.preview{position:relative;height:49vh;overflow:hidden;border:1px solid #46516a;border-radius:12px;background:#10192c}.panel{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#14213b}.panel[data-page=B]{background:#234d72}.panel strong{font-size:6.5vw;letter-spacing:-.06em}.panel small{font-size:2vw;color:#c9d9f6;margin-top:2vh}.panel b{font-size:1.6vw;letter-spacing:.12em;color:#b6d0ff;margin-bottom:2vh}.actions{display:flex;align-items:center;gap:1.2vw;margin-top:2.5vh;font-size:1.7vw}#detail{margin:2vh 0 0;font-size:1.7vw;min-height:3vh}button:disabled{opacity:.5;cursor:wait}
+</style>
+<h1>장면이 바뀌는 순간</h1><p>텍스트 등장이 아니라, 화면 전체가 바뀌는 전환효과를 비교해보세요.</p>
+<div class="choices" role="group" aria-label="전환효과 선택"><button data-effect="fade" aria-pressed="true">페이드 · Fade</button><button data-effect="slide" aria-pressed="false">밀어내기 · Push</button><button data-effect="zoom" aria-pressed="false">줌 · Zoom</button><button data-effect="wipe" aria-pressed="false">와이프 · Wipe</button></div>
+<div class="preview" aria-label="전환효과 미리보기"><div class="panel" data-page="A"><b>SCENE A</b><strong>질문을 발견하다</strong><small>같은 두 장면으로 움직임을 비교합니다</small></div></div>
+<div class="actions"><button id="play">다음 장면 재생 →</button><button id="loop" aria-pressed="false">반복 재생</button><span id="state" role="status">현재 장면 A</span></div><p id="detail">페이드: 이전 장면이 사라지며 다음 장면이 겹쳐 나타납니다.</p>
+<script>
+const preview=document.querySelector('.preview'),play=document.querySelector('#play'),loop=document.querySelector('#loop'),state=document.querySelector('#state');
+const descriptions={fade:'페이드: 이전 장면이 사라지며 다음 장면이 겹쳐 나타납니다.',slide:'밀어내기: 다음 장면이 오른쪽에서 들어오며 이전 장면을 왼쪽으로 밀어냅니다.',zoom:'줌: 다음 장면이 작게 시작해 화면을 채우며 나타납니다.',wipe:'와이프: 왼쪽에서 오른쪽으로 경계가 이동하며 다음 장면을 드러냅니다.'};
+let effect='fade',current='A',busy=false,timer;
+const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+async function transition(){
+ if(busy)return;busy=true;play.disabled=true;
+ const old=preview.firstElementChild,next=old.cloneNode(true),target=current==='A'?'B':'A';
+ next.dataset.page=target;next.querySelector('b').textContent='SCENE '+target;next.querySelector('strong').textContent=target==='A'?'질문을 발견하다':'답변으로 연결하다';old.setAttribute('aria-hidden','true');preview.append(next);
+ const frames={fade:[{opacity:0},{opacity:1}],slide:[{transform:'translateX(100%)'},{transform:'translateX(0)'}],zoom:[{opacity:0,transform:'scale(.7)'},{opacity:1,transform:'scale(1)'}],wipe:[{clipPath:'inset(0 100% 0 0)'},{clipPath:'inset(0 0% 0 0)'}]};
+ const timing={duration:reduced.matches?0:900,easing:'cubic-bezier(.22,1,.36,1)',fill:'both'};
+ const animations=[next.animate(frames[effect],timing)];
+ if(effect==='slide')animations.push(old.animate([{transform:'translateX(0)'},{transform:'translateX(-100%)'}],timing));
+ await Promise.all(animations.map(a=>a.finished));old.remove();animations.forEach(a=>a.cancel());current=target;state.textContent='현재 장면 '+current;busy=false;play.disabled=false;
+}
+function stopLoop(){clearInterval(timer);timer=undefined;loop.setAttribute('aria-pressed','false');loop.textContent='반복 재생'}
+document.querySelectorAll('[data-effect]').forEach(button=>button.onclick=()=>{effect=button.dataset.effect;document.querySelectorAll('[data-effect]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));document.querySelector('#detail').textContent=descriptions[effect];transition()});
+play.onclick=transition;loop.onclick=()=>{if(timer){stopLoop();return}loop.setAttribute('aria-pressed','true');loop.textContent='반복 정지';transition();timer=setInterval(transition,2700)};
+reduced.addEventListener('change',()=>{stopLoop();if(reduced.matches)preview.getAnimations({subtree:true}).forEach(a=>a.finish())});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stopLoop()});
+</script></html>
