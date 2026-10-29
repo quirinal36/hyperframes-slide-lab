@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const meter = requests.get(ip);
   if (meter && meter.expires > now && meter.count >= 30) return Response.json({ error:'조회가 많습니다. 1분 뒤 다시 시도해주세요.' }, { status:429, headers:{ ...headers,'Retry-After':'60' } });
   requests.set(ip, { expires:meter && meter.expires > now ? meter.expires : now+60000, count:meter && meter.expires > now ? meter.count+1 : 1 });
-  const key = JSON.stringify([params.get('pnu'),params.get('lat'),params.get('lon')]);
+  const key = JSON.stringify(params.get('pnu'));
   const saved = cache.get(key);
   if (saved && saved.expires > now) return Response.json(saved.data, { headers });
   try {

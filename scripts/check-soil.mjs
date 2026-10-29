@@ -6,11 +6,10 @@ const xml=`<response><header><Result_Code>200</Result_Code></header><body><items
 const rows=decodeSoil(xml,pnu)[0];assert.equal(rows.length,27);assert.equal(rows.find(x=>x.field==='Soildra_Cd').value,'약간양호');assert.equal(rows.find(x=>x.field==='Vldsoildep_Cd').value,'보통_50-100cm');
 assert.throws(()=>decodeSoil(xml,'1111111111111111111'),{status:502});assert.throws(()=>decodeSoil('<Result_Code>301</Result_Code>',pnu),{status:404});
 assert.equal(decodeSoil(xml.replace('<Soildra_Cd>03','<Soildra_Cd>98'),pnu)[0].find(x=>x.field==='Soildra_Cd').value,'정의되지 않은 코드');
-let calls=0;const env={SOIL_API_KEY:'test-key',VWORLD_API_KEY:'test-vworld'};
-const fakeFetch=async (url,options)=>{calls++;if(url.hostname==='api.vworld.kr'){assert.equal(options.headers.Referer,'https://hyperframes-slide-lab.letscoding.chatgpt.site/');assert.equal(url.searchParams.get('geomFilter'),'POINT(127.047 35.835)');return Response.json({response:{status:'OK',result:{featureCollection:{features:[{properties:{pnu,addr:'테스트 필지'}}]}}}})}assert.equal(url.searchParams.get('PNU_CD'),pnu);assert.equal(url.searchParams.get('serviceKey'),'test-key');return new Response(xml)};
-const data=await lookupSoil(new URLSearchParams({lat:'35.835',lon:'127.047'}),env,fakeFetch);assert.equal(calls,2);assert.equal(data.pnu,pnu);assert.equal(data.address,'테스트 필지');assert.ok(!JSON.stringify(data).includes('test-key'));
-for(const query of [{pnu:'123'},{pnu:'1'.repeat(19)+'a'},{lat:'NaN',lon:'127'},{lat:'0',lon:'127'},{lon:'127'}])await assert.rejects(()=>lookupSoil(new URLSearchParams(query),env,fakeFetch),{status:400});
-await assert.rejects(()=>lookupSoil(new URLSearchParams({lat:'35',lon:'127'}),{SOIL_API_KEY:'test'},fakeFetch),{status:503});
-await assert.rejects(()=>lookupSoil(new URLSearchParams({lat:'35',lon:'127'}),env,async()=>Response.json({response:{status:'NOT_FOUND'}})),{status:404});
-assert.equal(calls,2,'Rejected inputs must not invoke upstreams');
-console.log('PASS: official code mapping, two-service coordinate lookup, PNU integrity, unknown/missing data, validation, missing-key state, secret-free output.');
+let calls=0;const env={SOIL_API_KEY:'test-key'};
+const fakeFetch=async url=>{calls++;assert.equal(url.hostname,'apis.data.go.kr');assert.equal(url.searchParams.get('PNU_CD'),pnu);assert.equal(url.searchParams.get('serviceKey'),'test-key');return new Response(xml)};
+const data=await lookupSoil(new URLSearchParams({pnu}),env,fakeFetch);assert.equal(calls,1);assert.equal(data.pnu,pnu);assert.ok(!JSON.stringify(data).includes('test-key'));
+for(const query of [{pnu:'123'},{pnu:'1'.repeat(19)+'a'},{lat:'NaN',lon:'127'},{lat:'35',lon:'127'},{}])await assert.rejects(()=>lookupSoil(new URLSearchParams(query),env,fakeFetch),{status:400});
+await assert.rejects(()=>lookupSoil(new URLSearchParams({pnu}),{},fakeFetch),{status:503});
+assert.equal(calls,1,'Rejected inputs must not invoke upstreams');
+console.log('PASS: 27 official field mappings, PNU integrity, no-data/unknown codes, input validation, missing-key state, single server API, secret-free output.');
