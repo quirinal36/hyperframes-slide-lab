@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import { decodeSoil, lookupSoil } from '../lib/soil-service.mjs';
+import codebook from '../lib/soil-codebook.json' with { type:'json' };
+const pnu='5115034022100750001';
+const xml=`<response><header><Result_Code>200</Result_Code></header><body><items><item><PNU_Cd>${pnu}</PNU_Cd>${codebook.map(x=>`<${x.field}>03</${x.field}>`).join('')}</item></items></body></response>`;
+const rows=decodeSoil(xml,pnu)[0];assert.equal(rows.length,27);assert.equal(rows.find(x=>x.field==='Soildra_Cd').value,'약간양호');assert.equal(rows.find(x=>x.field==='Vldsoildep_Cd').value,'보통_50-100cm');
+assert.throws(()=>decodeSoil(xml,'1111111111111111111'),{status:502});assert.throws(()=>decodeSoil('<Result_Code>301</Result_Code>',pnu),{status:404});
+assert.equal(decodeSoil(xml.replace('<Soildra_Cd>03','<Soildra_Cd>98'),pnu)[0].find(x=>x.field==='Soildra_Cd').value,'정의되지 않은 코드');
+let calls=0;const env={SOIL_API_KEY:'test-key',VWORLD_API_KEY:'test-vworld'};
+const fakeFetch=async url=>{calls++;if(url.hostname==='api.vworld.kr'){assert.equal(url.searchParams.get('geomFilter'),'POINT(127.047 35.835)');return Response.json({response:{status:'OK',result:{featureCollection:{features:[{properties:{pnu,addr:'테스트 필지'}}]}}}})}assert.equal(url.searchParams.get('PNU_CD'),pnu);assert.equal(url.searchParams.get('serviceKey'),'test-key');return new Response(xml)};
+const data=await lookupSoil(new URLSearchParams({lat:'35.835',lon:'127.047'}),env,fakeFetch);assert.equal(calls,2);assert.equal(data.pnu,pnu);assert.equal(data.address,'테스트 필지');assert.ok(!JSON.stringify(data).includes('test-key'));
+for(const query of [{pnu:'123'},{pnu:'1'.repeat(19)+'a'},{lat:'NaN',lon:'127'},{lat:'0',lon:'127'},{lon:'127'}])await assert.rejects(()=>lookupSoil(new URLSearchParams(query),env,fakeFetch),{status:400});
+await assert.rejects(()=>lookupSoil(new URLSearchParams({lat:'35',lon:'127'}),{SOIL_API_KEY:'test'},fakeFetch),{status:503});
+await assert.rejects(()=>lookupSoil(new URLSearchParams({lat:'35',lon:'127'}),env,async()=>Response.json({response:{status:'NOT_FOUND'}})),{status:404});
+assert.equal(calls,2,'Rejected inputs must not invoke upstreams');
+console.log('PASS: official code mapping, two-service coordinate lookup, PNU integrity, unknown/missing data, validation, missing-key state, secret-free output.');
